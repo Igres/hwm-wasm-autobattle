@@ -1,0 +1,54 @@
+// ==UserScript==
+// @name         HWM WASM Engine (Safe Version)
+// @namespace    http://tampermonkey.net/
+// @version      3.0
+// @match        *://*.heroeswm.ru/*
+// @grant        none
+// @run-at       document-idle
+// ==/UserScript==
+
+(async () => {
+
+    const baseUrl = 'https://raw.githubusercontent.com/Igres/wasm-test/main/';
+
+    const jsText = await fetch(baseUrl + 'main.js').then(r => r.text());
+    const createModule = (0, eval)(jsText + "\ncreateModule;");
+    const wasmBinary = await fetch(baseUrl + 'main.wasm').then(r => r.arrayBuffer());
+
+    const Module = await createModule({ wasmBinary });
+
+    console.log("WASM loaded ✅");
+
+    function readUnitsFromPage() {
+
+        const pole = window.stage?.[window.war_scr];
+        if (!pole || !pole.obj) return [];
+
+        return Object.values(pole.obj).map(u => ({
+            x: u.x | 0,
+            y: u.y | 0
+        }));
+    }
+
+    setInterval(() => {
+
+        const jsUnits = readUnitsFromPage();
+
+        // создаём embind vector
+        const vec = new Module.VectorUnit();
+
+        for (const u of jsUnits) {
+            vec.push_back(u);
+        }
+
+        Module.setUnits(vec);
+
+        const result = Module.calculateSomething();
+
+        console.log("Result:", result);
+
+        vec.delete();
+
+    }, 100); // 10 раз в секунду
+
+})();
